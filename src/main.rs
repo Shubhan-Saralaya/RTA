@@ -14,10 +14,10 @@ async fn main() {
         clear_background(WHITE);
         
         for i in room.borders.iter(){
-            draw_line(i.start.x, i.start.y, i.end.x, i.end.y, i.absorbtion, BLACK);
+            draw_line(i.start.x, i.start.y, i.pos.x, i.pos.y, i.absorbtion, BLACK);
         }
         for ray  in rays.iter_mut(){
-            draw_line(ray.origin.x, ray.origin.y, ray.end.x, ray.end.y, 3.0, RED);
+            draw_line(ray.source.x, ray.source.y, ray.pos.x, ray.pos.y, 3.0, RED);
             move_fixed(ray, 10.0)
         }
 
@@ -26,7 +26,7 @@ async fn main() {
 }
 
 fn move_fixed(ray: &mut Ray, speed: f32){
-    ray.end += ray.dir * speed;
+    ray.pos += ray.dir * speed;
 }
 
-//: MIGHT HAVE TO ADD CUR_POS vector to the struct for the graphic representation. inorder to keep origin stable
+//: MIGHT HAVE TO ADD CUR_POS vector to the struct for the graphic representation. inorder to keep source stable
