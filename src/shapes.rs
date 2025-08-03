@@ -1,9 +1,10 @@
 use macroquad::prelude::*;
+use std::f32::EPSILON;
 #[derive(Debug)]
 pub struct LineSegment{
     pub start: Vec2,
     pub pos: Vec2,
-    pub absorbtion: f32
+    pub absorption: f32
 }
 impl LineSegment {
     /// 2D “cross” (determinant)
@@ -47,13 +48,13 @@ pub struct Border{
     pub borders: [LineSegment; 4]
 }
 impl Border{
-    pub fn new(x1: f32, y1: f32, x2: f32, y2: f32, absorbtion: f32) -> Self {
+    pub fn new(x1: f32, y1: f32, x2: f32, y2: f32, absorption: f32) -> Self {
         Border {
             borders: [
-                LineSegment { start: vec2(x1, y1), pos: vec2(x2, y1), absorbtion },
-                LineSegment { start: vec2(x2, y1), pos: vec2(x2, y2), absorbtion },
-                LineSegment { start: vec2(x2, y2), pos: vec2(x1, y2), absorbtion },
-                LineSegment { start: vec2(x1, y2), pos: vec2(x1, y1), absorbtion }
+                LineSegment { start: vec2(x1, y1), pos: vec2(x2, y1), absorption },
+                LineSegment { start: vec2(x2, y1), pos: vec2(x2, y2), absorption },
+                LineSegment { start: vec2(x2, y2), pos: vec2(x1, y2), absorption },
+                LineSegment { start: vec2(x1, y2), pos: vec2(x1, y1), absorption }
             ]
         }
     }
@@ -67,8 +68,38 @@ impl Ray{
         let pos = source + dir.normalize() * 10.0;
         Ray { source: source, dir: dir,pos: pos, depth: (depth), path_len: (path_len), energy: (energy) }
     }
-    
+    pub fn cast(&mut self, walls: &[LineSegment]) -> Option<Hit> {
+        // 1) find nearest intersection
+        let mut best: Option<Hit> = None;
+        for (ix, wall) in walls.iter().enumerate() {
+            if let Some(hit) = wall.intersect(self.source, self.dir, ix) {
+                best = match best {
+                    Some(ref b) if hit.t < b.t => Some(hit),
+                    None                       => Some(hit),
+                    _                          => best,
+                };
+            }
+        }
+
+        // 2) if we hit something, update ray for the bounce
+        if let Some(hit) = best.as_ref() {
+            // accumulate distance traveled
+            self.path_len += hit.t;
+            // reflect direction: d' = d − 2(d·n)n
+            let d_dot_n = self.dir.dot(hit.normal);
+            self.dir = (self.dir - 2.0 * d_dot_n * hit.normal).normalize();
+            // attenuate energy by wall absorption
+            let a = walls[hit.wall_ix].absorption;
+            self.energy -= a;
+            // move source just off the surface to avoid self‐hit
+            self.source = hit.point + hit.normal * EPSILON;
+            // increment bounce count
+            self.depth += 1;
+        }
+        best
+    }
 }
+#[derive(Clone)]
 pub struct Ray {
     pub source:   Vec2,   // where the ray starts
     pub dir:      Vec2,   // normalized direction of travel
@@ -78,7 +109,7 @@ pub struct Ray {
     pub energy:   f32,    // remaining amplitude/energy (1.0 → full, 0.0 → none)
 }
 pub struct Hit {
-    point:   Vec2,   // exact intersection point in world space
+    pub point:   Vec2,   // exact intersection point in world space
     normal:  Vec2,   // surface normal at that point (unit length)
     t:       f32,    // “how far along the ray” the hit occurred
     wall_ix: usize,  // index into your walls array (for material/absorption info)
